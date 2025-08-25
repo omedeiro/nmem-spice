@@ -1,0 +1,255 @@
+******************************
+** HTRON BEHAVIORAL MODEL  * *
+******************************
+
+* This file contains the model and parameters definition
+* required to simulate the hTron behavior as described in
+* the publication by Karam et. al. (arXiv:2401.12360)
+*
+* The transient behavior defines the time-dependent response
+* that the hTron will exhibit due to its non-instantaneous
+* thermal response.
+* It is modeled from the experimental data of activation delay
+* {tau_on} (delay between the input of a current pulse and the
+* switching of the channel). From this delay, a
+* simple circuit mimicking the heat transfer from the heater
+* to the channel is defined, through the parameter {tau_thermal}).
+* The role of this circuit is to filter and delay the arrival of
+* the heat pulse on the channel, simulating the propagation of the
+* heat through the oxide layer.
+*
+* The static behavior defines the amount of suppression
+* that the channel will experience due to a DC heater current
+* input.
+* This static behavior part is modeled by two parameters, {Jsw_tilde}
+* and {Isupp_tilde}, which are extracted from the hTron
+* experimental data.
+* With these two parameters, the channel temperature
+* is first approximated (from the input heater current),
+* which further defines the channel switching current
+* at each time point.
+* As said above, the delayed heater current from the transient behavior
+* is used to get a non-instantaneous response to a heater current
+* pulse.
+
+
+
+**************************************************
+** PARAMETERS AND MODEL DEFINITION **
+**************************************************
+.subckt hTron_behav heater_p heater_n drain source Meas_TCh Meas_Isw Meas_Ihs
++ chan_width=1u            heater_width=0.5u      
++ chan_thickness=23.6n      chan_length=14u      
++ sheet_resistance=77.9      heater_resistance=50  
++ critical_temp=12.5         substrate_temp=4.2    
++ eta=3                     Jsw_tilde=70G         
++ Isupp_tilde=1024u         Jchanr=100G          
++ tau_on=7.74n              ICh_bias_on=827.8u    
++ Ih_bias_on=747.2u
+
+*   chan_width - Channel width (m)
+*   heater_width - Heater width (m)
+*   chan_thickness - Channel thickness (m)
+*   chan_length - Channel length (m)
+*   sheet_resistance - Sheet resistance (Ohms)
+*   heater_resistance - Heater resistance (Ohms)
+*   critical_temp - Critical temperature (K)
+*   substrate_temp - Substrate temperature (K)
+*   eta - Efficiency factor (2 or 3)
+*   Jsw_tilde - Switching current density (y-intercept) (A/m^2)
+*   Isupp_tilde - Enable suppression current density (x-intercept)(A)
+*   Jchanr - Constriction current density (A/m^2)
+*   tau_on - Turn-on activation delay (s)
+*   ICh_bias_on - Channel bias point for set activation delay (A)
+*   Ih_bias_on - Heater bias point for set activation delay (A)
+
+**************************************************
+** PARAMETERS **
+**************************************************
+* Number of squares in superconducting channel
+.PARAM chan_squares=chan_length/chan_width
+
+* Normal state resistance
+.PARAM chan_resistance = sheet_resistance*chan_length/chan_width
+
+* Resistivity (Ohm m)
+.PARAM rho = sheet_resistance*chan_thickness
+
+* Thermal conductivity (W/m K)
+.PARAM kappa = 0.108
+
+* Heat capacity (J/m^3 K)
+.PARAM heatCapacity_c = 4400
+
+* Thermal conductivity (W/m^2 K) of substrate interface
+.PARAM hc = 50k
+
+* Sheet inductance (pH/square)
+.PARAM inductivity = {1.38p*sheet_resistance/critical_temp}
+
+* Channel inductance (pH)
+.PARAM chan_inductance = {inductivity*chan_squares}
+
+* Characteristic velocity (m/s)
+.PARAM vo={1*sqrt(hc*kappa/chan_thickness)/heatCapacity_c}
+
+* Switching current at substrate temperature (A)
+.PARAM Isw_Tsub = Isw(substrate_temp)
+
+* Stekly parameter (unitless)
+.PARAM psi = rho*(Isw_Tsub)**2/(hc*(chan_width**2)*chan_thickness*(critical_temp-substrate_temp))
+
+* Retrapping current (A)
+.PARAM Ir = sqrt(2/psi)*Isw_Tsub
+
+* Compute Ih_supp and Jc_0K (valid values of eta are 2 or 3)
+.PARAM alpha = if(eta == 2, 0.88, 0.7)
+.PARAM beta  = if(eta == 2, 1.25, 1.12)
+
+* Ideal critical current density => At 0K
+.PARAM Jc_0K = alpha * Jsw_tilde / (1 - (substrate_temp / critical_temp)**3)**2.1
+  * Jsw(ih=0) is given by alpha * Jsw_tilde
+
+* Suppressing current
+* .PARAM Ih_supp = beta * Isupp_tilde
+.PARAM Ih_supp = Isupp_tilde
+
+* Determine the nanowire temperature from the heater current
+.PARAM a = (critical_temp**4 - substrate_temp**4) / Ih_supp**eta
+
+* Temperature at which the channel switched (i.e at which Isw(Tch)=ICh_bias_on)
+.PARAM T_switch = critical_temp*(1-(ICh_bias_on/(Jc_0K*chan_thickness*chan_width))**(1/2.1))**(1/3)
+* Heater current needed to reach TCh = T_switch
+.PARAM Ih_switch = max(1p, ( (T_switch**4 - substrate_temp**4)/(critical_temp**4-substrate_temp**4))**(1/eta)*Ih_supp)
+* RC time constant that makes the filtered heater current reach Ih_switch in time tau_on
+.PARAM tau_thermal = - tau_on/ln(1- (Ih_switch/Ih_bias_on) )
+
+* a small offset for stability
+.PARAM delta=1u
+  
+* scaling factor for stability
+.PARAM scale=1e10
+  
+.param Phi0=2.068e-15  ; Flux quantum (Wb)
+
+**************************************************
+** HEATER SUBCIRCUIT **
+**************************************************
+* Heater resistor between the two ports
+R_heater heater_p heater_n {heater_resistance}
+  * Used to sense the heater current
+
+
+**************************************************
+** S/C SENSE SUBCIRCUIT **
+**************************************************
+* The sub-circuit is split into two sources for stability
+* V(N_c_Isw_state) is 1 if the current in channel overcomes Isw, 0 otherwise
+BI_safe_Lc chan_current 0 V = sgn(i(Lc)) * max(abs(i(Lc)), 1n)
+
+B_c_Isw_state N_c_Isw_state 0
++ V = stp(
++     abs(V(chan_current)) * scale
++     - V(Meas_Isw) * scale
++ )
+
+* V(N_c_state) is 0 if wire s/c, 1 if normal
+B_c_state N_c_state 0
++ V = buf(
++     V(N_c_Isw_state) 
++     | 
++     ((V(N_hotspot_resistance) > 0) 
++     & 
++     stp(
++         abs(i(Lc)) * scale 
++         - V(Meas_Ihs) * scale
++     ))
++ )
+
+**************************************************
+** HOTSPOT GROWTH INTEGRATOR SUBCIRCUIT **
+**************************************************
+R_enable N_enable 0 1G
+B_enable N_enable 0 V = if(V(N_c_state) & (V(N_hotspot_resistance) < chan_resistance), 1, 0)
+
+BI_ratio N_norm_current 0 V = V(chan_current) / V(Meas_Isw)
+
+B_sqrt_arg N_sqrt_arg 0 V = psi * V(N_norm_current)**2 - 1
+B_sqrt_approx N_sqrt_approx 0 V = (V(N_sqrt_arg) + delta) / 2
+
+  B_c_hotspot N_hotspot_resistance 0 V = sdt(
+  +   V(N_enable) * ( (2 * sheet_resistance * vo / chan_width) * 
+  +   (psi * V(N_norm_current)**2 - 2) /
+  +   max(1u, V(N_sqrt_arg) + {delta}) ),
+  +   0, 
+  +   V(N_c_state) < 0.5
+  + )
+
+
+**************************************************
+** TRANSIENT BEHAVIOR: HEAT TRANSFER SUB-CIRCUIT **
+**************************************************
+
+* Lumped-elements circuit, mimics the heat transfer
+B_heat N001 0 
++ V = I(R_heater)
+
+R1 heat N001 1
+C1 heat 0 {tau_thermal}
+  * {tau_thermal} makes sure the activation delay is {tau_on} at the bias point [ICh_bias_on, Ih_bias_on]
+  * V(heat) is the "filtered" output node of the subcircuit
+R_stab N001 0 1G
+  * Stability resistor
+
+**************************************************
+** STATIC BEHAVIOR: PARAMETERS AND FITTING **
+**************************************************
+
+.func TCh(I) 
++ (a * I**eta + substrate_temp**4) ** 0.25
+
+* Determine the switching current from the nanowire temperature
+.func Isw(T) 
++ Jc_0K * chan_width * chan_thickness * (1 - (T / critical_temp)**3) ** 2.1
+
+.funct Iretrap(T)
++ sqrt(max(1n, hc*(chan_width**2)*chan_thickness*critical_temp/rho)) * sqrt(max(1n, 1 - (T / critical_temp)))
+**************************************************
+** BEHAVIORAL SOURCES **
+**************************************************
+
+* Used to get values of functions at every time point
+B1 Meas_TCh 0 
++ V = min(critical_temp-1m, TCh(V(heat)))
+  * Channel temperature
+
+B2 Meas_Isw 0 
++ V = min(Jchanr * chan_width * chan_thickness , Isw(V(Meas_TCh)))
+  * Channel switching current, with the possibility of adding a constriction plateau
+
+* Replace 1 by 0.99 in B3 to improve stability in large circuits
+B3 Meas_Ihs 0 
++ V = max(1n, min(Iretrap(V(Meas_TCh))*2, 0.99 * V(Meas_Isw)))
+  * Retrapping current
+
+
+**************************************************
+** MAIN NANOWIRE CIRCUIT **
+**************************************************
+
+Lc drain N_hs 
++ Flux = {chan_inductance} * x / (2.0 * cos(0.67 * asin(0.6 * abs(x) / Isw_Tsub)) - 1) 
++ Rser = 1e-100 
++ Rpar = 1e6
+  * Channel inductor
+
+V_sense N_hs N_rhs 0
+B_Rhs N_rhs source V = V(N_hotspot_resistance) * i(V_sense)
+
+
+R_GND N_hs 0 1T
+R_GND2 source 0 1T
+  * Ground resistors
+
+
+.ends hTron_behav

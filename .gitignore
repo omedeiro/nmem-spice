@@ -1,0 +1,47 @@
+# OS-generated files
+.DS_Store       # macOS
+Thumbs.db       # Windows
+
+# Compiled files and build artifacts
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+*.egg-info/
+dist/
+*.exe
+*.app
+*.war
+
+# Temporary files
+*.tmp
+*.log
+
+# Data files
+*.csv
+*.mat
+*.h5
+*.gds
+
+# Media files
+*.mp4
+*.avi
+*.flv
+*.mov
+*.wmv
+*.tiff
+*.png
+*.gif 
+
+# Documents
+*.pdf
+*.txt
+*.raw
+*.html
+
+# Simulation and CAD files
+*.cir
+*.plt
+*.net
+*.asc
+*.yaml

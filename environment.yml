@@ -1,0 +1,32 @@
+name: nmem-spice
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - numpy
+  - gdspy
+  - yaml
+  - pip:
+    - qnnpy
+    - black
+    - git+https://github.com/qnngroup/qnngds.git@OM-1-port-functions
+    - phidl
+    - ipykernel
+    - pre-commit
+    - ruff
+    - scipy
+    - cycler
+    - mariadb
+    - pyvisa
+    - tdgl
+    - tables
+    - tqdm
+    - pandas
+    - scikit-optimize
+    - matplotlib
+    - ltspice
+    - imageio
+    - mplsoccer
+    - jinja2
+

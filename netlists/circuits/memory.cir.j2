@@ -1,0 +1,40 @@
+; Auto-generated. Do not edit by hand.
+; --- Simulation: {{ tag }} ---
+
+; -------- Parameters --------
+.param R1={{ R1_val }} R2={{ R2_val }} R3={{ R3_val }} R4={{ R4_val }}
+.param tstop={{ tstop }} tstep={{ tstep }} rel={{ reltol }}
+.param HL_w={{ HL.chan_width }} HL_L={{ HL.chan_length }} HL_Rh={{ HL.heater_resistance }}
+.param HR_w={{ HR.chan_width }} HR_L={{ HR.chan_length }} HR_Rh={{ HR.heater_resistance }}
+
+; -------- Sources --------
+I1 0 N001 PWL file="{{ wave_enab }}"
+I2 0 N003 PWL file="{{ wave_chan }}"
+
+; -------- Passives --------
+R1 N001 N002 {R1}
+R2 N003 out  {R2}
+R3 out  0    {R3}
+R4 out  0    {R4}
+
+; -------- hTron Instances --------
+X_HL N002 N004 out 0 tempL N005 N007 hTron_behav
++ chan_width={HL_w} chan_length={HL_L} heater_resistance={HL_Rh}
+
+X_HR N004 0 out 0 tempR N006 N008 hTron_behav
++ chan_width={HR_w} chan_length={HR_L} heater_resistance={HR_Rh}
+
+; -------- Sense Resistors --------
+R_irhr N008 0 1
+R_irchr N006 0 1
+R_irhl N007 0 1
+R_ircl N005 0 1
+
+; -------- Analysis / Options --------
+.tran 0 {tstop} 0 {tstep}
+.options reltol={rel}
+
+.include {{ model_path }}
+
+.backanno
+.end
